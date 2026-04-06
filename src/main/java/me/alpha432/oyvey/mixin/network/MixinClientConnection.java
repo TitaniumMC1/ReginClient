@@ -13,7 +13,7 @@ public class MixinClientConnection {
     @Inject(method = "send(Lnet/minecraft/network/packet/Packet;)V", at = @At("HEAD"), cancellable = true)
     private void onSendPacket(Packet<?> packet, CallbackInfo ci) {
         if (PacketInterceptor.onOutgoingPacket(packet)) {
-            ci.cancel();
+            ci.cancel();  // only cancel if we explicitly want to block (rare)
         }
     }
 }
