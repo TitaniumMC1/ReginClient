@@ -1,6 +1,6 @@
-package com.oyvey.mixin.network;
+package me.alpha432.oyvey.mixin.network;
 
-import com.oyvey.utils.PacketInterceptor;
+import me.alpha432.oyvey.utils.PacketInterceptor;
 import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.network.packet.s2c.play.ChunkDataS2CPacket;
 import org.spongepowered.asm.mixin.Mixin;
