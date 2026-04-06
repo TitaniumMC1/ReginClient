@@ -1,54 +1,58 @@
-package me.alpha432.oyvey.module.impl.donut;
+package com.oyvey.utils;
 
-import me.alpha432.oyvey.OyVey; // your main class
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.network.packet.Packet;
 import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
 import net.minecraft.network.packet.s2c.play.ChunkDataS2CPacket;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
+import net.minecraft.util.math.Vec3d;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class DonutAntiEspBypass {
-    private static final MinecraftClient mc = MinecraftClient.getInstance();
     private static boolean enabled = false;
     private static final ConcurrentHashMap<ChunkPos, byte[]> disguisedChunks = new ConcurrentHashMap<>();
     private static final List<BlockPos> revealedOres = new ArrayList<>();
     private static final List<BlockPos> revealedChests = new ArrayList<>();
     private static int spoofCooldown = 0;
+    private static final MinecraftClient mc = MinecraftClient.getInstance();
 
     public static void enable() {
+        if (enabled) return;
         enabled = true;
-        OyVey.LOGGER.info("[OyVey] DonutAntiEspBypass enabled");
+        PacketInterceptor.registerChunkHandler(DonutAntiEspBypass::onChunkData);
+        PacketInterceptor.registerMoveHandler(DonutAntiEspBypass::onPlayerMove);
+        System.out.println("[OyVey] DonutAntiEspBypass enabled");
     }
 
     public static void disable() {
         enabled = false;
-        disguisedChunks.clear();
+        PacketInterceptor.registerChunkHandler(null);
+        PacketInterceptor.registerMoveHandler(null);
         revealedOres.clear();
         revealedChests.clear();
+        disguisedChunks.clear();
     }
 
-    public static void onChunkData(ChunkDataS2CPacket packet) {
-        if (!enabled || mc.player == null) return;
-
+    private static void onChunkData(ChunkDataS2CPacket packet) {
+        if (!enabled) return;
         ChunkPos pos = packet.getChunkPos();
-        disguisedChunks.put(pos, packet.getData());
+        byte[] data = packet.getData(); // compressed block data (disguised version)
+        disguisedChunks.put(pos, data);
 
-        // Trigger double-load attack
-        if (spoofCooldown <= 0) {
+        // Trigger double-load attack (spoof position to get real chunk data)
+        if (spoofCooldown <= 0 && mc.player != null) {
             spoofPositionInsideChunk(pos);
-            spoofCooldown = 20;
-        } else {
+            spoofCooldown = 20; // cooldown in ticks
+        } else if (spoofCooldown > 0) {
             spoofCooldown--;
         }
 
-        // Scan for hidden tile entities (chests/shulkers)
+        // Scan for hidden tile entities (chests, shulkers) that slipped through
         var blockEntities = packet.getBlockEntities();
         for (var nbt : blockEntities) {
             String id = nbt.getString("id");
@@ -59,15 +63,16 @@ public class DonutAntiEspBypass {
                 BlockPos chestPos = new BlockPos(x, y, z);
                 if (!revealedChests.contains(chestPos)) {
                     revealedChests.add(chestPos);
-                    if (mc.player != null)
+                    if (mc.player != null) {
                         mc.player.sendMessage(Text.literal("§6[OyVey] §eChest found at §f" + x + " " + y + " " + z), false);
+                    }
                 }
             }
         }
     }
 
     private static void spoofPositionInsideChunk(ChunkPos pos) {
-        if (mc.getNetworkHandler() == null) return;
+        if (mc.player == null || mc.getNetworkHandler() == null) return;
         double centerX = pos.getStartX() + 8;
         double centerZ = pos.getStartZ() + 8;
         double fakeY = mc.player.getY();
@@ -75,7 +80,7 @@ public class DonutAntiEspBypass {
             new PlayerMoveC2SPacket.PositionAndOnGround(centerX, fakeY, centerZ, true);
         mc.getNetworkHandler().sendPacket(fakePacket);
 
-        // Compare after 2 ticks
+        // After 2 ticks, compare disguised vs real chunk
         mc.execute(() -> {
             try { Thread.sleep(50); } catch (InterruptedException ignored) {}
             compareAndReveal(pos);
@@ -95,8 +100,9 @@ public class DonutAntiEspBypass {
                     if (isValuableBlock(current)) {
                         if (!revealedOres.contains(bp)) {
                             revealedOres.add(bp);
-                            if (mc.player != null)
+                            if (mc.player != null) {
                                 mc.player.sendMessage(Text.literal("§6[OyVey] §aOre revealed: §f" + bp.getX() + " " + bp.getY() + " " + bp.getZ()), false);
+                            }
                         }
                     }
                 }
@@ -113,21 +119,25 @@ public class DonutAntiEspBypass {
                block == Blocks.SHULKER_BOX;
     }
 
-    public static boolean onOutgoingPacket(Packet<?> packet) {
-        // You can modify movement packets here if needed, but for now just observe
-        return false;
+    private static void onPlayerMove(PlayerMoveC2SPacket packet) {
+        // Reserved for future advanced spoofing (e.g., modify packet on the fly)
     }
 
-    // Call this from your render event (e.g., Render3DEvent)
+    // Call this in your render loop (e.g., RenderWorldLastEvent) to draw ESP boxes
     public static void onRender3D() {
         if (!enabled || mc.player == null) return;
-        // Draw ESP boxes for revealedOres and revealedChests
-        // Use your client's existing ESP renderer (e.g., RenderUtils.drawBox)
         for (BlockPos pos : revealedOres) {
-            // drawBox(pos, 0xFFFF0000);
+            drawBox(pos, 0xFFFF0000, "ORE");
         }
         for (BlockPos pos : revealedChests) {
-            // drawBox(pos, 0xFF00FF00);
+            drawBox(pos, 0xFF00FF00, "CHEST");
         }
+    }
+
+    private static void drawBox(BlockPos pos, int color, String label) {
+        // Use your client's existing render utilities.
+        // Example with a simple box around the block:
+        // RenderUtils.drawBlockBox(pos, color);
+        // RenderUtils.drawText(label, pos.getX() + 0.5, pos.getY() + 1.2, pos.getZ() + 0.5, color);
     }
 }
