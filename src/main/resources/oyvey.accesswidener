@@ -6,7 +6,3 @@ accessible method net/minecraft/network/protocol/game/ServerboundInteractPacket$
 accessible class net/minecraft/network/protocol/game/ServerboundInteractPacket$ActionType
 accessible field net/minecraft/network/protocol/game/ServerboundInteractPacket action Lnet/minecraft/network/protocol/game/ServerboundInteractPacket$Action;
 accessible method net/minecraft/client/multiplayer/MultiPlayerGameMode ensureHasSentCarriedItem ()V
-
-# PlayerMoveC2SPacket fields – use "accessible field", not "accessible class field"
-accessible field net/minecraft/network/packet/c2s/play/PlayerMoveC2SPacket x D
-accessible field net/minecraft/network/packet/c2s/play/PlayerMoveC2SPacket z D
