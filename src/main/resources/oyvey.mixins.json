@@ -5,13 +5,13 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "network.MixinConnection",
-    "network.MixinClientPlayNetworkHandler"
+    "network.MixinClientPlayNetworkHandler",
+    "network.MixinClientPacketListener"
   ],
   "client": [
     "entity.MixinClientPlayerEntity",
     "input.MixinKeyboardHandler",
     "input.MixinMouseHandler",
-    "network.MixinClientPacketListener",
     "render.MixinChatComponent",
     "render.MixinLevelRenderer",
     "render.MixinDeltaTrackerTimer",
