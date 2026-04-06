@@ -1,53 +1,47 @@
-package com.oyvey.module.impl.donut;
+package me.alpha432.oyvey.module.impl.donut;
 
-import com.oyvey.utils.PacketInterceptor;
-import com.oyvey.utils.FakeEntityFilter;
+import me.alpha432.oyvey.OyVey; // your main class
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.network.packet.Packet;
 import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
 import net.minecraft.network.packet.s2c.play.ChunkDataS2CPacket;
+import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.text.Text;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class DonutAntiEspBypass {
+    private static final MinecraftClient mc = MinecraftClient.getInstance();
     private static boolean enabled = false;
-    private static ConcurrentHashMap<ChunkPos, byte[]> disguisedChunks = new ConcurrentHashMap<>();
-    private static List<BlockPos> revealedOres = new ArrayList<>();
-    private static List<BlockPos> revealedChests = new ArrayList<>();
+    private static final ConcurrentHashMap<ChunkPos, byte[]> disguisedChunks = new ConcurrentHashMap<>();
+    private static final List<BlockPos> revealedOres = new ArrayList<>();
+    private static final List<BlockPos> revealedChests = new ArrayList<>();
     private static int spoofCooldown = 0;
-    private static MinecraftClient mc = MinecraftClient.getInstance();
 
     public static void enable() {
-        if (enabled) return;
         enabled = true;
-        PacketInterceptor.registerChunkHandler(DonutAntiEspBypass::onChunkData);
-        PacketInterceptor.registerMoveHandler(DonutAntiEspBypass::onPlayerMove);
-        System.out.println("[OyVey] DonutAntiEspBypass enabled");
+        OyVey.LOGGER.info("[OyVey] DonutAntiEspBypass enabled");
     }
 
     public static void disable() {
         enabled = false;
-        PacketInterceptor.registerChunkHandler(null);
-        PacketInterceptor.registerMoveHandler(null);
+        disguisedChunks.clear();
         revealedOres.clear();
         revealedChests.clear();
-        disguisedChunks.clear();
     }
 
-    private static void onChunkData(ChunkDataS2CPacket packet) {
-        if (!enabled) return;
-        ChunkPos pos = packet.getChunkPos();
-        byte[] data = packet.getData(); // compressed block data
-        disguisedChunks.put(pos, data);
+    public static void onChunkData(ChunkDataS2CPacket packet) {
+        if (!enabled || mc.player == null) return;
 
-        // Trigger double-load attack every 20 chunks
-        if (spoofCooldown <= 0 && mc.player != null) {
+        ChunkPos pos = packet.getChunkPos();
+        disguisedChunks.put(pos, packet.getData());
+
+        // Trigger double-load attack
+        if (spoofCooldown <= 0) {
             spoofPositionInsideChunk(pos);
             spoofCooldown = 20;
         } else {
@@ -73,7 +67,7 @@ public class DonutAntiEspBypass {
     }
 
     private static void spoofPositionInsideChunk(ChunkPos pos) {
-        if (mc.player == null || mc.getNetworkHandler() == null) return;
+        if (mc.getNetworkHandler() == null) return;
         double centerX = pos.getStartX() + 8;
         double centerZ = pos.getStartZ() + 8;
         double fakeY = mc.player.getY();
@@ -81,9 +75,9 @@ public class DonutAntiEspBypass {
             new PlayerMoveC2SPacket.PositionAndOnGround(centerX, fakeY, centerZ, true);
         mc.getNetworkHandler().sendPacket(fakePacket);
 
-        // After 2 ticks, compare disguised vs real chunk
+        // Compare after 2 ticks
         mc.execute(() -> {
-            try { Thread.sleep(50); } catch (Exception ignored) {}
+            try { Thread.sleep(50); } catch (InterruptedException ignored) {}
             compareAndReveal(pos);
         });
     }
@@ -92,6 +86,7 @@ public class DonutAntiEspBypass {
         if (mc.world == null) return;
         byte[] disguised = disguisedChunks.get(pos);
         if (disguised == null) return;
+
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
                 for (int y = mc.world.getBottomY(); y <= mc.world.getTopY(); y++) {
@@ -118,23 +113,21 @@ public class DonutAntiEspBypass {
                block == Blocks.SHULKER_BOX;
     }
 
-    private static void onPlayerMove(PlayerMoveC2SPacket packet) {
-        // Not needed for bypass, but we keep hook for future
+    public static boolean onOutgoingPacket(Packet<?> packet) {
+        // You can modify movement packets here if needed, but for now just observe
+        return false;
     }
 
-    // Call this in your render loop to draw ESP boxes
+    // Call this from your render event (e.g., Render3DEvent)
     public static void onRender3D() {
         if (!enabled || mc.player == null) return;
+        // Draw ESP boxes for revealedOres and revealedChests
+        // Use your client's existing ESP renderer (e.g., RenderUtils.drawBox)
         for (BlockPos pos : revealedOres) {
-            drawBox(pos, 0xFFFF0000, "ORE");
+            // drawBox(pos, 0xFFFF0000);
         }
         for (BlockPos pos : revealedChests) {
-            drawBox(pos, 0xFF00FF00, "CHEST");
+            // drawBox(pos, 0xFF00FF00);
         }
-    }
-
-    private static void drawBox(BlockPos pos, int color, String label) {
-        // Implement using your client's render utilities or native JNI
-        // Example with simple WorldRenderer (omitted for brevity)
     }
 }
