@@ -6,17 +6,16 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class FakeEntityFilter {
-    private static ConcurrentHashMap<UUID, Integer> trustScores = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<UUID, Integer> trustScores = new ConcurrentHashMap<>();
 
     public static boolean isFake(Entity entity) {
         if (!(entity instanceof PlayerEntity)) return false;
         UUID id = entity.getUuid();
         // DonutSMP fake players often have UUID starting with 00000000-
         if (id.toString().startsWith("00000000-")) return true;
-        // No equipment changes? No movement? Low trust.
+        // If entity never moves or changes equipment for 5+ seconds, mark as fake
         int score = trustScores.getOrDefault(id, 0);
-        if (score < -5) return true;
-        return false;
+        return score < -10;
     }
 
     public static void recordMovement(Entity entity) {
