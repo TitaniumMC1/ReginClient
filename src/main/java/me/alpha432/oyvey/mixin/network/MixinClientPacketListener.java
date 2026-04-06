@@ -1,20 +1,17 @@
-package me.alpha432.oyvey.mixin.network;
+package com.oyvey.mixin.network;
 
-import me.alpha432.oyvey.event.impl.network.ChatEvent;
-import net.minecraft.client.multiplayer.ClientPacketListener;
+import com.oyvey.utils.PacketInterceptor;
+import net.minecraft.client.network.ClientPlayNetworkHandler;
+import net.minecraft.network.packet.s2c.play.ChunkDataS2CPacket;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import static me.alpha432.oyvey.util.traits.Util.EVENT_BUS;
-
-@Mixin(ClientPacketListener.class)
+@Mixin(ClientPlayNetworkHandler.class)
 public class MixinClientPacketListener {
-    @Inject(method = "sendChat", at = @At("HEAD"), cancellable = true)
-    private void sendChat(String content, CallbackInfo ci) {
-        if (EVENT_BUS.post(new ChatEvent(content))) {
-            ci.cancel();
-        }
+    @Inject(method = "onChunkData", at = @At("HEAD"))
+    private void onChunkData(ChunkDataS2CPacket packet, CallbackInfo ci) {
+        PacketInterceptor.onIncomingChunk(packet);
     }
 }
